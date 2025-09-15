@@ -4,77 +4,66 @@ using Microsoft.AspNetCore.Mvc;
 using DeviceManagementAPI.Interfaces;
 using System;
 using System.Linq;
-using System.Text.RegularExpressions;
+using System.Data;
+using DeviceManagementAPI.Helpers;
 
 [Route("api/[controller]")]
 [ApiController]
 public class DeviceController : ControllerBase
 {
     private readonly IDeviceService _deviceService;
-    private const int MAX_DEVICE_NAME_LENGTH = 100;
-
     public DeviceController(IDeviceService deviceService)
     {
         _deviceService = deviceService;
     }
 
-
-
+    // GET: api/device
     [HttpGet]
     public IActionResult GetAll()
     {
         try
         {
-            var devices = _deviceService.GetAllDevices();
-            return Ok(devices);
+            DataTable dt = _deviceService.GetAllDevices();
+            return Ok(dt.ToDictionaryList()); // convert to JSON-safe
         }
-        catch (Exception)
+        catch
         {
             return StatusCode(500, new { message = "Unexpected error while fetching devices." });
         }
     }
 
+    // GET: api/device/5
     [HttpGet("{id}")]
     public IActionResult GetById(int id)
     {
         try
         {
-            var device = _deviceService.GetDeviceById(id);
-            if (device == null)
+            DataTable dt = _deviceService.GetDeviceById(id);
+            if (dt.Rows.Count == 0)
                 return NotFound(new { message = $"Device with ID {id} not found." });
 
-            return Ok(device);
+            return Ok(dt.ToDictionaryList()[0]); // single row as JSON
         }
-        catch (Exception)
+        catch
         {
             return StatusCode(500, new { message = "Unexpected error while fetching the device." });
         }
     }
 
+    // POST: api/device
     [HttpPost]
     public IActionResult Create([FromBody] CreateDeviceDto dto)
     {
         try
         {
-            var trimmedName = dto.DeviceName?.Trim() ?? "";
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
 
-            // Validations
-            if (string.IsNullOrWhiteSpace(trimmedName) || trimmedName.ToLower() == "string")
-                return BadRequest(new { message = "Device name is required." });
+            string trimmedName = dto.DeviceName?.Trim() ?? "";
 
-            if (trimmedName.Length > MAX_DEVICE_NAME_LENGTH)
-                return BadRequest(new { message = $"Device name cannot exceed {MAX_DEVICE_NAME_LENGTH} characters." });
-
-            if (Regex.IsMatch(trimmedName, @"^\d+$"))
-                return BadRequest(new { message = "Device name cannot be only numbers." });
-
-            if (!Regex.IsMatch(trimmedName, @"^[a-zA-Z0-9 _-]+$"))
-                return BadRequest(new { message = "Device name can only contain letters, numbers, spaces, hyphens, or underscores." });
-
-            if (!Regex.IsMatch(trimmedName, @"[a-zA-Z0-9]"))
-                return BadRequest(new { message = "Device name must contain at least one letter or number." });
-
-            if (_deviceService.GetAllDevices().Any(d => d.DeviceName.Trim().ToLower() == trimmedName.ToLower()))
+            // Duplicate check
+            var allDevices = _deviceService.GetAllDevices().ToDictionaryList();
+            if (allDevices.Any(d => d["DeviceName"].ToString()?.Trim().ToLower() == trimmedName.ToLower()))
                 return BadRequest(new { message = "Device with this name already exists." });
 
             var device = new Device
@@ -85,42 +74,33 @@ public class DeviceController : ControllerBase
                     : dto.Description.Trim()
             };
 
-            var success = _deviceService.CreateDevice(device);
+            bool success = _deviceService.CreateDevice(device);
             if (!success)
                 return StatusCode(500, new { message = "Failed to create device." });
 
             return CreatedAtAction(nameof(GetById), new { id = device.Id }, device);
         }
-        catch (Exception)
+        catch
         {
             return StatusCode(500, new { message = "Unexpected error while creating the device." });
         }
     }
 
+    // PUT: api/device/5
     [HttpPut("{id}")]
     public IActionResult Update(int id, [FromBody] UpdateDeviceDto dto)
     {
         try
         {
-            var trimmedName = dto.DeviceName?.Trim() ?? "";
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
 
-            // Validations
-            if (string.IsNullOrWhiteSpace(trimmedName) || trimmedName.ToLower() == "string")
-                return BadRequest(new { message = "Device name is required." });
+            string trimmedName = dto.DeviceName?.Trim() ?? "";
 
-            if (trimmedName.Length > MAX_DEVICE_NAME_LENGTH)
-                return BadRequest(new { message = $"Device name cannot exceed {MAX_DEVICE_NAME_LENGTH} characters." });
-
-            if (Regex.IsMatch(trimmedName, @"^\d+$"))
-                return BadRequest(new { message = "Device name cannot be only numbers." });
-
-            if (!Regex.IsMatch(trimmedName, @"^[a-zA-Z0-9 _-]+$"))
-                return BadRequest(new { message = "Device name can only contain letters, numbers, spaces, hyphens, or underscores." });
-
-            if (!Regex.IsMatch(trimmedName, @"[a-zA-Z0-9]"))
-                return BadRequest(new { message = "Device name must contain at least one letter or number." });
-
-            if (_deviceService.GetAllDevices().Any(d => d.DeviceName.Trim().ToLower() == trimmedName.ToLower() && d.Id != id))
+            // Duplicate check excluding current device
+            var allDevices = _deviceService.GetAllDevices().ToDictionaryList();
+            if (allDevices.Any(d => d["DeviceName"].ToString()?.Trim().ToLower() == trimmedName.ToLower()
+                                   && Convert.ToInt32(d["Id"]) != id))
                 return BadRequest(new { message = "Device with this name already exists." });
 
             var device = new Device
@@ -132,30 +112,31 @@ public class DeviceController : ControllerBase
                     : dto.Description.Trim()
             };
 
-            var success = _deviceService.UpdateDevice(device);
+            bool success = _deviceService.UpdateDevice(device);
             if (!success)
                 return NotFound(new { message = $"Device with ID {id} not found." });
 
             return Ok(new { message = $"Device with ID {id} updated successfully." });
         }
-        catch (Exception)
+        catch
         {
             return StatusCode(500, new { message = "Unexpected error while updating the device." });
         }
     }
 
+    // DELETE: api/device/5
     [HttpDelete("{id}")]
     public IActionResult Delete(int id)
     {
         try
         {
-            var success = _deviceService.DeleteDevice(id);
+            bool success = _deviceService.DeleteDevice(id);
             if (!success)
                 return NotFound(new { message = $"Device with ID {id} not found." });
 
             return Ok(new { message = $"Device with ID {id} deleted successfully." });
         }
-        catch (Exception)
+        catch
         {
             return StatusCode(500, new { message = "Unexpected error while deleting the device." });
         }

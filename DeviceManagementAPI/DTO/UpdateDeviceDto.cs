@@ -1,15 +1,14 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using DeviceManagementAPI.Validations;
 
 namespace DeviceManagementAPI.DTOs
 {
     public class UpdateDeviceDto
     {
-        [Required(ErrorMessage = "Id is required for update")]
-        public int Id { get; set; }
-
-        [Required(ErrorMessage = "DeviceName is required")]
+        [DeviceNameValidation]
         public string DeviceName { get; set; } = string.Empty;
 
+        [MaxLength(250, ErrorMessage = "Description cannot exceed 250 characters.")]
         public string? Description { get; set; }
     }
 }

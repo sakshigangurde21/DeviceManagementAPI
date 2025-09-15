@@ -12,101 +12,137 @@ namespace DeviceManagementAPI.Services
 
         public DeviceServiceAdoNet(IConfiguration config)
         {
-            _connectionString = config.GetConnectionString("DefaultConnection");
+            _connectionString = config.GetConnectionString("DefaultConnection")
+                ?? throw new ArgumentNullException("DefaultConnection", "Connection string not found.");
         }
 
         // Get all devices
-        public List<Device> GetAllDevices()
+        public DataTable GetAllDevices()
         {
-            var devices = new List<Device>();
-            using (SqlConnection conn = new SqlConnection(_connectionString))
+            try
             {
-                conn.Open();
-                SqlCommand cmd = new SqlCommand("SELECT Id, DeviceName, Description FROM Devices", conn);
-                SqlDataReader reader = cmd.ExecuteReader();
-                while (reader.Read())
+                DataTable dt = new DataTable();
+                using (SqlConnection conn = new SqlConnection(_connectionString))
+                using (SqlDataAdapter adapter = new SqlDataAdapter("GetAllDevices", conn))
                 {
-                    devices.Add(new Device
-                    {
-                        Id = reader.GetInt32(0),
-                        DeviceName = reader.GetString(1),
-                        Description = reader.IsDBNull(2) ? "No description" : reader.GetString(2)
-                    });
+                    adapter.SelectCommand.CommandType = CommandType.StoredProcedure;
+                    adapter.Fill(dt);
                 }
+
+                foreach (DataRow row in dt.Rows)
+                {
+                    if (row["Description"] == DBNull.Value || string.IsNullOrWhiteSpace(row["Description"]?.ToString()))
+                        row["Description"] = "No description";
+                }
+
+                return dt;
             }
-            return devices;
+            catch
+            {
+                throw;
+            }
         }
 
-        // Get by ID
-        public Device? GetDeviceById(int id)
+        // Get device by ID
+        public DataTable GetDeviceById(int id)
         {
-            Device? device = null;
-            using (SqlConnection conn = new SqlConnection(_connectionString))
+            try
             {
-                conn.Open();
-                SqlCommand cmd = new SqlCommand("SELECT Id, DeviceName, Description FROM Devices WHERE Id = @Id", conn);
-                cmd.Parameters.AddWithValue("@Id", id);
-
-                SqlDataReader reader = cmd.ExecuteReader();
-                if (reader.Read())
+                DataTable dt = new DataTable();
+                using (SqlConnection conn = new SqlConnection(_connectionString))
+                using (SqlDataAdapter adapter = new SqlDataAdapter("GetDeviceById", conn))
                 {
-                    device = new Device
-                    {
-                        Id = reader.GetInt32(0),
-                        DeviceName = reader.GetString(1),
-                        Description = reader.IsDBNull(2) ? "No description" : reader.GetString(2)
-                    };
+                    adapter.SelectCommand.CommandType = CommandType.StoredProcedure;
+                    adapter.SelectCommand.Parameters.AddWithValue("@Id", id);
+                    adapter.Fill(dt);
                 }
+
+                if (dt.Rows.Count > 0)
+                {
+                    var row = dt.Rows[0];
+                    if (row["Description"] == DBNull.Value || string.IsNullOrWhiteSpace(row["Description"]?.ToString()))
+                        row["Description"] = "No description";
+                }
+
+                return dt;
             }
-            return device; // null if not found
+            catch
+            {
+                throw;
+            }
         }
 
         // Create device
         public bool CreateDevice(Device device)
         {
-            using (SqlConnection conn = new SqlConnection(_connectionString))
+            try
             {
-                conn.Open();
-                SqlCommand cmd = new SqlCommand(
-                    "INSERT INTO Devices (DeviceName, Description) VALUES (@DeviceName, @Description)", conn);
-                cmd.Parameters.AddWithValue("@DeviceName", device.DeviceName);
-                cmd.Parameters.AddWithValue("@Description",
-                    string.IsNullOrEmpty(device.Description) ? DBNull.Value : device.Description);
+                using (SqlConnection conn = new SqlConnection(_connectionString))
+                using (SqlDataAdapter adapter = new SqlDataAdapter())
+                {
+                    adapter.InsertCommand = new SqlCommand("InsertDevice", conn);
+                    adapter.InsertCommand.CommandType = CommandType.StoredProcedure;
+                    adapter.InsertCommand.Parameters.AddWithValue("@DeviceName", device.DeviceName ?? "");
+                    adapter.InsertCommand.Parameters.AddWithValue("@Description",
+                        string.IsNullOrWhiteSpace(device.Description) ? DBNull.Value : device.Description);
 
-                int rows = cmd.ExecuteNonQuery();
-                return rows > 0; // true if inserted
+                    conn.Open();
+                    int rows = adapter.InsertCommand.ExecuteNonQuery();
+                    return rows > 0;
+                }
+            }
+            catch
+            {
+                throw;
             }
         }
 
         // Update device
         public bool UpdateDevice(Device device)
         {
-            using (SqlConnection conn = new SqlConnection(_connectionString))
+            try
             {
-                conn.Open();
-                SqlCommand cmd = new SqlCommand(
-                    "UPDATE Devices SET DeviceName = @DeviceName, Description = @Description WHERE Id = @Id", conn);
-                cmd.Parameters.AddWithValue("@Id", device.Id);
-                cmd.Parameters.AddWithValue("@DeviceName", device.DeviceName);
-                cmd.Parameters.AddWithValue("@Description",
-                    string.IsNullOrEmpty(device.Description) ? DBNull.Value : device.Description);
+                using (SqlConnection conn = new SqlConnection(_connectionString))
+                using (SqlDataAdapter adapter = new SqlDataAdapter())
+                {
+                    adapter.UpdateCommand = new SqlCommand("UpdateDevice", conn);
+                    adapter.UpdateCommand.CommandType = CommandType.StoredProcedure;
+                    adapter.UpdateCommand.Parameters.AddWithValue("@Id", device.Id);
+                    adapter.UpdateCommand.Parameters.AddWithValue("@DeviceName", device.DeviceName ?? "");
+                    adapter.UpdateCommand.Parameters.AddWithValue("@Description",
+                        string.IsNullOrWhiteSpace(device.Description) ? DBNull.Value : device.Description);
 
-                int rows = cmd.ExecuteNonQuery();
-                return rows > 0; 
+                    conn.Open();
+                    int rows = adapter.UpdateCommand.ExecuteNonQuery();
+                    return rows > 0;
+                }
+            }
+            catch
+            {
+                throw;
             }
         }
 
         // Delete device
         public bool DeleteDevice(int id)
         {
-            using (SqlConnection conn = new SqlConnection(_connectionString))
+            try
             {
-                conn.Open();
-                SqlCommand cmd = new SqlCommand("DELETE FROM Devices WHERE Id = @Id", conn);
-                cmd.Parameters.AddWithValue("@Id", id);
+                using (SqlConnection conn = new SqlConnection(_connectionString))
+                using (SqlDataAdapter adapter = new SqlDataAdapter())
+                {
+                    adapter.DeleteCommand = new SqlCommand("DeleteDevice", conn);
+                    adapter.DeleteCommand.CommandType = CommandType.StoredProcedure;
+                    adapter.DeleteCommand.Parameters.AddWithValue("@Id", id);
 
-                int rows = cmd.ExecuteNonQuery();
-                return rows > 0; 
+                    conn.Open();
+                    int rows = adapter.DeleteCommand.ExecuteNonQuery();
+                    return rows > 0;
+                }
+            }
+            catch
+            {
+                throw;
             }
         }
     }
