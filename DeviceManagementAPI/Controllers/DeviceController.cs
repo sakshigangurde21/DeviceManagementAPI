@@ -141,4 +141,29 @@ public class DeviceController : ControllerBase
             return StatusCode(500, new { message = "Unexpected error while deleting the device." });
         }
     }
+
+    [HttpGet("paged")]
+    public IActionResult GetPaged([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 10)
+    {
+        try
+        {
+            DataSet ds = _deviceService.GetDevicesPagination(pageNumber, pageSize);
+
+            var devices = ds.Tables[0].ToDictionaryList(); // current page
+            int totalCount = Convert.ToInt32(ds.Tables[1].Rows[0]["TotalCount"]);
+
+            return Ok(new
+            {
+                Data = devices,
+                TotalRecords = totalCount,
+                PageNumber = pageNumber,
+                PageSize = pageSize
+            });
+        }
+        catch
+        {
+            return StatusCode(500, new { message = "Unexpected error while fetching paged devices." });
+        }
+    }
+
 }

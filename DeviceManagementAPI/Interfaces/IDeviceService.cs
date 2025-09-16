@@ -11,6 +11,8 @@ namespace DeviceManagementAPI.Interfaces
         bool CreateDevice(Device device); // return true/false
         bool UpdateDevice(Device device); // return true/false
         bool DeleteDevice(int id);        // return true/false
+        DataSet GetDevicesPagination(int pageNumber, int pageSize);
+
     }
 }
 

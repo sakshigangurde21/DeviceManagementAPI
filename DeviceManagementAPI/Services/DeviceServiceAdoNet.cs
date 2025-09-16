@@ -9,7 +9,6 @@ namespace DeviceManagementAPI.Services
     public class DeviceServiceAdoNet : IDeviceService
     {
         private readonly string _connectionString;
-
         public DeviceServiceAdoNet(IConfiguration config)
         {
             _connectionString = config.GetConnectionString("DefaultConnection")
@@ -145,5 +144,29 @@ namespace DeviceManagementAPI.Services
                 throw;
             }
         }
+
+        public DataSet GetDevicesPagination(int pageNumber, int pageSize)
+        {
+            try
+            {
+                using (SqlConnection conn = new SqlConnection(_connectionString))
+                using (SqlDataAdapter adapter = new SqlDataAdapter("GetDevicesPagination", conn))
+                {
+                    adapter.SelectCommand.CommandType = CommandType.StoredProcedure;
+                    adapter.SelectCommand.Parameters.AddWithValue("@PageNumber", pageNumber);
+                    adapter.SelectCommand.Parameters.AddWithValue("@PageSize", pageSize);
+
+                    DataSet ds = new DataSet();
+                    adapter.Fill(ds);
+
+                    return ds; // ds.Tables[0] = page data, ds.Tables[1] = total count
+                }
+            }
+            catch
+            {
+                throw;
+            }
+        }
+
     }
 }
