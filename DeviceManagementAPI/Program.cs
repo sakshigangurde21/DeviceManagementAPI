@@ -1,5 +1,6 @@
 ﻿using DeviceManagementAPI.Services;
 using DeviceManagementAPI.Interfaces;
+using DeviceManagementAPI.Hubs; // ✅ import your hub
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -9,13 +10,17 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddScoped<IDeviceService, DeviceServiceAdoNet>();
 
+// ✅ Add SignalR
+builder.Services.AddSignalR();
+
 // Add CORS
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend",
         policy => policy.WithOrigins("http://localhost:3000") // React dev server
                         .AllowAnyHeader()
-                        .AllowAnyMethod());
+                        .AllowAnyMethod()
+                        .AllowCredentials()); // ✅ needed for SignalR
 });
 
 var app = builder.Build();
@@ -35,5 +40,8 @@ app.UseCors("AllowFrontend");
 app.UseAuthorization();
 
 app.MapControllers();
+
+// ✅ Map the hub
+app.MapHub<DeviceHub>("/deviceHub");
 
 app.Run();

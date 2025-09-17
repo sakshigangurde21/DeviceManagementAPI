@@ -6,15 +6,20 @@ using System;
 using System.Linq;
 using System.Data;
 using DeviceManagementAPI.Helpers;
+using DeviceManagementAPI.Hubs; 
+using Microsoft.AspNetCore.SignalR; 
 
 [Route("api/[controller]")]
 [ApiController]
 public class DeviceController : ControllerBase
 {
     private readonly IDeviceService _deviceService;
-    public DeviceController(IDeviceService deviceService)
+    private readonly IHubContext<DeviceHub> _hubContext; // inject SignalR Hub
+
+    public DeviceController(IDeviceService deviceService, IHubContext<DeviceHub> hubContext)
     {
         _deviceService = deviceService;
+        _hubContext = hubContext;
     }
 
     // GET: api/device
@@ -24,7 +29,7 @@ public class DeviceController : ControllerBase
         try
         {
             DataTable dt = _deviceService.GetAllDevices();
-            return Ok(dt.ToDictionaryList()); // convert to JSON-safe
+            return Ok(dt.ToDictionaryList());
         }
         catch
         {
@@ -42,7 +47,7 @@ public class DeviceController : ControllerBase
             if (dt.Rows.Count == 0)
                 return NotFound(new { message = $"Device with ID {id} not found." });
 
-            return Ok(dt.ToDictionaryList()[0]); // single row as JSON
+            return Ok(dt.ToDictionaryList()[0]);
         }
         catch
         {
@@ -52,7 +57,7 @@ public class DeviceController : ControllerBase
 
     // POST: api/device
     [HttpPost]
-    public IActionResult Create([FromBody] CreateDeviceDto dto)
+    public async Task<IActionResult> Create([FromBody] CreateDeviceDto dto)
     {
         try
         {
@@ -61,7 +66,6 @@ public class DeviceController : ControllerBase
 
             string trimmedName = dto.DeviceName?.Trim() ?? "";
 
-            // Duplicate check
             var allDevices = _deviceService.GetAllDevices().ToDictionaryList();
             if (allDevices.Any(d => d["DeviceName"].ToString()?.Trim().ToLower() == trimmedName.ToLower()))
                 return BadRequest(new { message = "Device with this name already exists." });
@@ -78,6 +82,9 @@ public class DeviceController : ControllerBase
             if (!success)
                 return StatusCode(500, new { message = "Failed to create device." });
 
+            // Broadcast event
+            await _hubContext.Clients.All.SendAsync("ReceiveNotification", "Device added successfully");
+
             return CreatedAtAction(nameof(GetById), new { id = device.Id }, device);
         }
         catch
@@ -88,7 +95,7 @@ public class DeviceController : ControllerBase
 
     // PUT: api/device/5
     [HttpPut("{id}")]
-    public IActionResult Update(int id, [FromBody] UpdateDeviceDto dto)
+    public async Task<IActionResult> Update(int id, [FromBody] UpdateDeviceDto dto)
     {
         try
         {
@@ -97,7 +104,6 @@ public class DeviceController : ControllerBase
 
             string trimmedName = dto.DeviceName?.Trim() ?? "";
 
-            // Duplicate check excluding current device
             var allDevices = _deviceService.GetAllDevices().ToDictionaryList();
             if (allDevices.Any(d => d["DeviceName"].ToString()?.Trim().ToLower() == trimmedName.ToLower()
                                    && Convert.ToInt32(d["Id"]) != id))
@@ -116,6 +122,9 @@ public class DeviceController : ControllerBase
             if (!success)
                 return NotFound(new { message = $"Device with ID {id} not found." });
 
+            // Broadcast event
+            await _hubContext.Clients.All.SendAsync("ReceiveNotification", "Device updated successfully");
+
             return Ok(new { message = $"Device with ID {id} updated successfully." });
         }
         catch
@@ -126,13 +135,16 @@ public class DeviceController : ControllerBase
 
     // DELETE: api/device/5
     [HttpDelete("{id}")]
-    public IActionResult Delete(int id)
+    public async Task<IActionResult> Delete(int id)
     {
         try
         {
             bool success = _deviceService.DeleteDevice(id);
             if (!success)
                 return NotFound(new { message = $"Device with ID {id} not found." });
+
+            // Broadcast event
+            await _hubContext.Clients.All.SendAsync("ReceiveNotification", "Device deleted successfully");
 
             return Ok(new { message = $"Device with ID {id} deleted successfully." });
         }
@@ -149,7 +161,7 @@ public class DeviceController : ControllerBase
         {
             DataSet ds = _deviceService.GetDevicesPagination(pageNumber, pageSize);
 
-            var devices = ds.Tables[0].ToDictionaryList(); // current page
+            var devices = ds.Tables[0].ToDictionaryList();
             int totalCount = Convert.ToInt32(ds.Tables[1].Rows[0]["TotalCount"]);
 
             return Ok(new
@@ -165,5 +177,4 @@ public class DeviceController : ControllerBase
             return StatusCode(500, new { message = "Unexpected error while fetching paged devices." });
         }
     }
-
 }
