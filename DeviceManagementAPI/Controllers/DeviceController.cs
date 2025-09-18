@@ -11,15 +11,20 @@ using Microsoft.AspNetCore.SignalR;
 
 [Route("api/[controller]")]
 [ApiController]
+[Produces("application/json", "application/xml")] // <-- important
+
 public class DeviceController : ControllerBase
 {
     private readonly IDeviceService _deviceService;
     private readonly IHubContext<DeviceHub> _hubContext; // inject SignalR Hub
+    private readonly ILogger<DeviceController> _logger;
 
-    public DeviceController(IDeviceService deviceService, IHubContext<DeviceHub> hubContext)
+    public DeviceController(IDeviceService deviceService, IHubContext<DeviceHub> hubContext, ILogger<DeviceController> logger)
     {
         _deviceService = deviceService;
         _hubContext = hubContext;
+        _logger = logger;
+
     }
 
     // GET: api/device
@@ -31,8 +36,9 @@ public class DeviceController : ControllerBase
             DataTable dt = _deviceService.GetAllDevices();
             return Ok(dt.ToDictionaryList());
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.LogError(ex, "Error while fetching devices.");
             return StatusCode(500, new { message = "Unexpected error while fetching devices." });
         }
     }
@@ -49,9 +55,10 @@ public class DeviceController : ControllerBase
 
             return Ok(dt.ToDictionaryList()[0]);
         }
-        catch
+        catch (Exception ex)
         {
-            return StatusCode(500, new { message = "Unexpected error while fetching the device." });
+            _logger.LogError(ex, "Error while fetching devices.");
+            return StatusCode(500, new { message = "Unexpected error while fetching devices." });
         }
     }
 
@@ -83,13 +90,21 @@ public class DeviceController : ControllerBase
                 return StatusCode(500, new { message = "Failed to create device." });
 
             // Broadcast event
-            await _hubContext.Clients.All.SendAsync("ReceiveNotification", "Device added successfully");
+            try
+            {
+                await _hubContext.Clients.All.SendAsync("ReceiveNotification", "Device added successfully");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "SignalR broadcast failed.");
+            }
 
             return CreatedAtAction(nameof(GetById), new { id = device.Id }, device);
         }
-        catch
+        catch (Exception ex)
         {
-            return StatusCode(500, new { message = "Unexpected error while creating the device." });
+            _logger.LogError(ex, "Error while creating devices.");
+            return StatusCode(500, new { message = "Unexpected error while creating devices." });
         }
     }
 
@@ -123,13 +138,21 @@ public class DeviceController : ControllerBase
                 return NotFound(new { message = $"Device with ID {id} not found." });
 
             // Broadcast event
-            await _hubContext.Clients.All.SendAsync("ReceiveNotification", "Device updated successfully");
+            try
+            {
+                await _hubContext.Clients.All.SendAsync("ReceiveNotification", "Device updated successfully");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "SignalR broadcast failed.");
+            }
 
             return Ok(new { message = $"Device with ID {id} updated successfully." });
         }
-        catch
+        catch (Exception ex)
         {
-            return StatusCode(500, new { message = "Unexpected error while updating the device." });
+            _logger.LogError(ex, "Error while updating devices.");
+            return StatusCode(500, new { message = "Unexpected error while updating devices." });
         }
     }
 
@@ -144,13 +167,21 @@ public class DeviceController : ControllerBase
                 return NotFound(new { message = $"Device with ID {id} not found." });
 
             // Broadcast event
-            await _hubContext.Clients.All.SendAsync("ReceiveNotification", "Device deleted successfully");
+            try
+            {
+                await _hubContext.Clients.All.SendAsync("ReceiveNotification", "Device deleted successfully");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "SignalR broadcast failed.");
+            }
 
             return Ok(new { message = $"Device with ID {id} deleted successfully." });
         }
-        catch
+        catch (Exception ex)
         {
-            return StatusCode(500, new { message = "Unexpected error while deleting the device." });
+            _logger.LogError(ex, "Error while deleting devices.");
+            return StatusCode(500, new { message = "Unexpected error while deleting devices." });
         }
     }
 
@@ -172,9 +203,10 @@ public class DeviceController : ControllerBase
                 PageSize = pageSize
             });
         }
-        catch
+        catch (Exception ex)
         {
-            return StatusCode(500, new { message = "Unexpected error while fetching paged devices." });
+            _logger.LogError(ex, "Error while fetching devices.");
+            return StatusCode(500, new { message = "Unexpected error while fetching devices." });
         }
     }
 }

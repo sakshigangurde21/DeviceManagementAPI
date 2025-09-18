@@ -1,13 +1,21 @@
-﻿using DeviceManagementAPI.Services;
+﻿using DeviceManagementAPI.Hubs; // ✅ import your hub
 using DeviceManagementAPI.Interfaces;
-using DeviceManagementAPI.Hubs; // ✅ import your hub
+using DeviceManagementAPI.Services;
+using DeviceManagementAPI.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+       .AddXmlSerializerFormatters(); // ✅ add XML support
+
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(c =>
+{
+    var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+    c.IncludeXmlComments(xmlPath);
+});
 builder.Services.AddScoped<IDeviceService, DeviceServiceAdoNet>();
 
 // ✅ Add SignalR
@@ -34,8 +42,15 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+app.UseRouting();
+
+
 // Use CORS before Authorization
 app.UseCors("AllowFrontend");
+
+// Add custom middleware to count requests
+app.UseMiddleware<RequestCounterMiddleware>();
+
 
 app.UseAuthorization();
 
