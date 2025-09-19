@@ -1,39 +1,35 @@
-﻿using Microsoft.AspNetCore.Http;
-using System.Collections.Concurrent;
-using System.Threading.Tasks;
-using System;
-namespace DeviceManagementAPI.Middleware
+﻿namespace DeviceManagementAPI.Middleware
 {
+    using Microsoft.AspNetCore.Http;
+    using System.Collections.Concurrent;
+    using System.Threading.Tasks;
+    using System;
+    using DeviceManagementAPI.Services;
 
-
-
-
-    public class RequestCounterMiddleware
+    public class RequestCounterMiddleware : IMiddleware
     {
-        private readonly RequestDelegate _next;
+        private readonly ILogger<RequestCounterMiddleware> _logger;
+        private readonly RequestCounterService _counterService;
 
-        // Thread-safe dictionary for counting requests per endpoint
-        private static ConcurrentDictionary<string, int> _requestCounts = new ConcurrentDictionary<string, int>();
-
-        public RequestCounterMiddleware(RequestDelegate next)
+        public RequestCounterMiddleware(
+            ILogger<RequestCounterMiddleware> logger,
+            RequestCounterService counterService)
         {
-            _next = next;
+            _logger = logger;
+            _counterService = counterService;
         }
 
-        public async Task InvokeAsync(HttpContext context)
+        public async Task InvokeAsync(HttpContext context, RequestDelegate next)
         {
-            string path = context.Request.Path.ToString().ToLower();
+            var method = context.Request.Method;
+            var path = context.Request.Path.ToString()?.ToLower() ?? "";
+            var key = $"{method} {path}";
 
-            // Increment counter
-            _requestCounts.AddOrUpdate(path, 1, (key, oldValue) => oldValue + 1);
+            _counterService.RequestCounts.AddOrUpdate(key, 1, (_, v) => v + 1);
 
-            Console.WriteLine($"Endpoint {path} has been called {_requestCounts[path]} times.");
+            _logger.LogInformation($"[{DateTime.Now}] {key} has been called {_counterService.RequestCounts[key]} times.");
 
-            // Call the next middleware in the pipeline
-            await _next(context);
+            await next(context);
         }
-
-        // Optional: method to get counts
-        public static ConcurrentDictionary<string, int> GetRequestCounts() => _requestCounts;
     }
 }

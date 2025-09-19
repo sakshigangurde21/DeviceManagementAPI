@@ -1,13 +1,17 @@
 ﻿using DeviceManagementAPI.DTOs;
-using DeviceManagementAPI.Models;
-using Microsoft.AspNetCore.Mvc;
-using DeviceManagementAPI.Interfaces;
-using System;
-using System.Linq;
-using System.Data;
 using DeviceManagementAPI.Helpers;
 using DeviceManagementAPI.Hubs; 
+using DeviceManagementAPI.Interfaces;
+using DeviceManagementAPI.Models;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR; 
+using System;
+using System.Data;
+using System.Linq;
+using System.Xml;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using System.Xml.Linq;
 
 [Route("api/[controller]")]
 [ApiController]
@@ -24,7 +28,21 @@ public class DeviceController : ControllerBase
         _deviceService = deviceService;
         _hubContext = hubContext;
         _logger = logger;
+    }
 
+    private IActionResult FormatResponse(object data)
+    {
+        var acceptHeader = Request.Headers["Accept"].ToString();
+
+        if (!string.IsNullOrEmpty(acceptHeader) && acceptHeader.Contains("application/xml"))
+        {
+            var json = JsonConvert.SerializeObject(data);  // object → JSON
+            var xml = JsonConvert.DeserializeXNode(json, "Root");   // JSON → XML
+
+            return Content(xml.ToString(), "application/xml");    // return XML
+        }
+
+        return Ok(data);           // default = JSON
     }
 
     // GET: api/device
@@ -34,7 +52,7 @@ public class DeviceController : ControllerBase
         try
         {
             DataTable dt = _deviceService.GetAllDevices();
-            return Ok(dt.ToDictionaryList());
+            return FormatResponse(dt.ToDictionaryList());
         }
         catch (Exception ex)
         {
@@ -53,7 +71,7 @@ public class DeviceController : ControllerBase
             if (dt.Rows.Count == 0)
                 return NotFound(new { message = $"Device with ID {id} not found." });
 
-            return Ok(dt.ToDictionaryList()[0]);
+            return FormatResponse(dt.ToDictionaryList()[0]);
         }
         catch (Exception ex)
         {
@@ -195,13 +213,15 @@ public class DeviceController : ControllerBase
             var devices = ds.Tables[0].ToDictionaryList();
             int totalCount = Convert.ToInt32(ds.Tables[1].Rows[0]["TotalCount"]);
 
-            return Ok(new
+            var response = new
             {
                 Data = devices,
                 TotalRecords = totalCount,
                 PageNumber = pageNumber,
                 PageSize = pageSize
-            });
+            };
+
+            return FormatResponse(response);
         }
         catch (Exception ex)
         {
@@ -209,4 +229,5 @@ public class DeviceController : ControllerBase
             return StatusCode(500, new { message = "Unexpected error while fetching devices." });
         }
     }
+
 }

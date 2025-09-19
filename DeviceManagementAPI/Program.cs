@@ -6,8 +6,7 @@ using DeviceManagementAPI.Middleware;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-builder.Services.AddControllers()
-       .AddXmlSerializerFormatters(); // ✅ add XML support
+builder.Services.AddControllers();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
@@ -16,10 +15,17 @@ builder.Services.AddSwaggerGen(c =>
     var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
     c.IncludeXmlComments(xmlPath);
 });
+
 builder.Services.AddScoped<IDeviceService, DeviceServiceAdoNet>();
 
 // ✅ Add SignalR
 builder.Services.AddSignalR();
+
+// ✅ Register RequestCounterService as Singleton (shared dictionary)
+builder.Services.AddSingleton<RequestCounterService>();
+
+// ✅ Register middleware
+builder.Services.AddTransient<RequestCounterMiddleware>();
 
 // Add CORS
 builder.Services.AddCors(options =>
@@ -44,13 +50,11 @@ app.UseHttpsRedirection();
 
 app.UseRouting();
 
-
 // Use CORS before Authorization
 app.UseCors("AllowFrontend");
 
-// Add custom middleware to count requests
+// ✅ Add custom middleware to count requests
 app.UseMiddleware<RequestCounterMiddleware>();
-
 
 app.UseAuthorization();
 
