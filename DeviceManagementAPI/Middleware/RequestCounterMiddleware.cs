@@ -5,7 +5,6 @@
     using System.Threading.Tasks;
     using System;
     using DeviceManagementAPI.Services;
-
     public class RequestCounterMiddleware : IMiddleware
     {
         private readonly ILogger<RequestCounterMiddleware> _logger;

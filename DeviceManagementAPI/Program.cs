@@ -27,6 +27,8 @@ builder.Services.AddSingleton<RequestCounterService>();
 // ✅ Register middleware
 builder.Services.AddTransient<RequestCounterMiddleware>();
 
+builder.Configuration.AddUserSecrets<Program>();
+
 // Add CORS
 builder.Services.AddCors(options =>
 {
@@ -63,4 +65,4 @@ app.MapControllers();
 // ✅ Map the hub
 app.MapHub<DeviceHub>("/deviceHub");
 
-app.Run();
+await app.RunAsync();
