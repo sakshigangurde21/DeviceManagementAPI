@@ -1,47 +1,43 @@
-﻿using DeviceManagementAPI.Hubs; // ✅ import your hub
+﻿using DeviceManagementAPI.Hubs;
 using DeviceManagementAPI.Interfaces;
 using DeviceManagementAPI.Services;
 using DeviceManagementAPI.Middleware;
+using DeviceManagementAPI.Data;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
 builder.Services.AddControllers();
-
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(c =>
-{
-    var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
-    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
-    c.IncludeXmlComments(xmlPath);
-});
+builder.Services.AddSwaggerGen();
 
-builder.Services.AddScoped<IDeviceService, DeviceServiceAdoNet>();
+// ✅ Add EF Core
+builder.Services.AddDbContext<DeviceDbContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// ✅ Add SignalR
+// ✅ Register EF service instead of ADO.NET
+builder.Services.AddScoped<IDeviceService, DeviceServiceEf>();
+
+// ✅ SignalR
 builder.Services.AddSignalR();
 
-// ✅ Register RequestCounterService as Singleton (shared dictionary)
+// ✅ Request counter service
 builder.Services.AddSingleton<RequestCounterService>();
-
-// ✅ Register middleware
 builder.Services.AddTransient<RequestCounterMiddleware>();
 
 builder.Configuration.AddUserSecrets<Program>();
 
-// Add CORS
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend",
-        policy => policy.WithOrigins("http://localhost:3000") // React dev server
+        policy => policy.WithOrigins("http://localhost:3000")
                         .AllowAnyHeader()
                         .AllowAnyMethod()
-                        .AllowCredentials()); // ✅ needed for SignalR
+                        .AllowCredentials());
 });
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -49,20 +45,12 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-
 app.UseRouting();
-
-// Use CORS before Authorization
 app.UseCors("AllowFrontend");
-
-// ✅ Add custom middleware to count requests
 app.UseMiddleware<RequestCounterMiddleware>();
-
 app.UseAuthorization();
 
 app.MapControllers();
-
-// ✅ Map the hub
 app.MapHub<DeviceHub>("/deviceHub");
 
-await app.RunAsync();
+app.Run();

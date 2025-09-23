@@ -51,8 +51,8 @@ public class DeviceController : ControllerBase
     {
         try
         {
-            DataTable dt = _deviceService.GetAllDevices();
-            return FormatResponse(dt.ToDictionaryList());
+            var devices = _deviceService.GetAllDevices();
+            return FormatResponse(devices);
         }
         catch (Exception ex)
         {
@@ -61,17 +61,16 @@ public class DeviceController : ControllerBase
         }
     }
 
-    // GET: api/device/5
     [HttpGet("{id}")]
     public IActionResult GetById(int id)
     {
         try
         {
-            DataTable dt = _deviceService.GetDeviceById(id);
-            if (dt.Rows.Count == 0)
+            var device = _deviceService.GetDeviceById(id);
+            if (device == null)
                 return NotFound(new { message = $"Device with ID {id} not found." });
 
-            return FormatResponse(dt.ToDictionaryList()[0]);
+            return FormatResponse(device);
         }
         catch (Exception ex)
         {
@@ -80,7 +79,6 @@ public class DeviceController : ControllerBase
         }
     }
 
-    // POST: api/device
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateDeviceDto dto)
     {
@@ -91,8 +89,8 @@ public class DeviceController : ControllerBase
 
             string trimmedName = dto.DeviceName?.Trim() ?? "";
 
-            var allDevices = _deviceService.GetAllDevices().ToDictionaryList();
-            if (allDevices.Any(d => d["DeviceName"].ToString()?.Trim().ToLower() == trimmedName.ToLower()))
+            var allDevices = _deviceService.GetAllDevices();
+            if (allDevices.Any(d => d.DeviceName.Trim().ToLower() == trimmedName.ToLower()))
                 return BadRequest(new { message = "Device with this name already exists." });
 
             var device = new Device
@@ -107,15 +105,7 @@ public class DeviceController : ControllerBase
             if (!success)
                 return StatusCode(500, new { message = "Failed to create device." });
 
-            // Broadcast event
-            try
-            {
-                await _hubContext.Clients.All.SendAsync("ReceiveNotification", "Device added successfully");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "SignalR broadcast failed.");
-            }
+            await _hubContext.Clients.All.SendAsync("ReceiveNotification", "Device added successfully");
 
             return CreatedAtAction(nameof(GetById), new { id = device.Id }, device);
         }
@@ -126,7 +116,6 @@ public class DeviceController : ControllerBase
         }
     }
 
-    // PUT: api/device/5
     [HttpPut("{id}")]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateDeviceDto dto)
     {
@@ -137,9 +126,8 @@ public class DeviceController : ControllerBase
 
             string trimmedName = dto.DeviceName?.Trim() ?? "";
 
-            var allDevices = _deviceService.GetAllDevices().ToDictionaryList();
-            if (allDevices.Any(d => d["DeviceName"].ToString()?.Trim().ToLower() == trimmedName.ToLower()
-                                   && Convert.ToInt32(d["Id"]) != id))
+            var allDevices = _deviceService.GetAllDevices();
+            if (allDevices.Any(d => d.DeviceName.Trim().ToLower() == trimmedName.ToLower() && d.Id != id))
                 return BadRequest(new { message = "Device with this name already exists." });
 
             var device = new Device
@@ -155,15 +143,7 @@ public class DeviceController : ControllerBase
             if (!success)
                 return NotFound(new { message = $"Device with ID {id} not found." });
 
-            // Broadcast event
-            try
-            {
-                await _hubContext.Clients.All.SendAsync("ReceiveNotification", "Device updated successfully");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "SignalR broadcast failed.");
-            }
+            await _hubContext.Clients.All.SendAsync("ReceiveNotification", "Device updated successfully");
 
             return Ok(new { message = $"Device with ID {id} updated successfully." });
         }
@@ -174,7 +154,6 @@ public class DeviceController : ControllerBase
         }
     }
 
-    // DELETE: api/device/5
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(int id)
     {
@@ -184,15 +163,7 @@ public class DeviceController : ControllerBase
             if (!success)
                 return NotFound(new { message = $"Device with ID {id} not found." });
 
-            // Broadcast event
-            try
-            {
-                await _hubContext.Clients.All.SendAsync("ReceiveNotification", "Device deleted successfully");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "SignalR broadcast failed.");
-            }
+            await _hubContext.Clients.All.SendAsync("ReceiveNotification", "Device deleted successfully");
 
             return Ok(new { message = $"Device with ID {id} deleted successfully." });
         }
@@ -208,10 +179,7 @@ public class DeviceController : ControllerBase
     {
         try
         {
-            DataSet ds = _deviceService.GetDevicesPagination(pageNumber, pageSize);
-
-            var devices = ds.Tables[0].ToDictionaryList();
-            int totalCount = Convert.ToInt32(ds.Tables[1].Rows[0]["TotalCount"]);
+            var (devices, totalCount) = _deviceService.GetDevicesPagination(pageNumber, pageSize);
 
             var response = new
             {
@@ -229,5 +197,4 @@ public class DeviceController : ControllerBase
             return StatusCode(500, new { message = "Unexpected error while fetching devices." });
         }
     }
-
 }
