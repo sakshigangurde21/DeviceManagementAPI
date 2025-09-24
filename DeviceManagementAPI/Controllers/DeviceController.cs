@@ -1,26 +1,21 @@
 ﻿using DeviceManagementAPI.DTOs;
-using DeviceManagementAPI.Helpers;
-using DeviceManagementAPI.Hubs; 
+using DeviceManagementAPI.Hubs;
 using DeviceManagementAPI.Interfaces;
 using DeviceManagementAPI.Models;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.SignalR; 
+using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.Logging;
 using System;
-using System.Data;
 using System.Linq;
-using System.Xml;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
-using System.Xml.Linq;
+using System.Threading.Tasks;
 
 [Route("api/[controller]")]
 [ApiController]
-[Produces("application/json", "application/xml")] // <-- important
-
+[Produces("application/json")] // Only JSON needed for React
 public class DeviceController : ControllerBase
 {
     private readonly IDeviceService _deviceService;
-    private readonly IHubContext<DeviceHub> _hubContext; // inject SignalR Hub
+    private readonly IHubContext<DeviceHub> _hubContext;
     private readonly ILogger<DeviceController> _logger;
 
     public DeviceController(IDeviceService deviceService, IHubContext<DeviceHub> hubContext, ILogger<DeviceController> logger)
@@ -30,37 +25,23 @@ public class DeviceController : ControllerBase
         _logger = logger;
     }
 
-    private IActionResult FormatResponse(object data)
-    {
-        var acceptHeader = Request.Headers["Accept"].ToString();
-
-        if (!string.IsNullOrEmpty(acceptHeader) && acceptHeader.Contains("application/xml"))
-        {
-            var json = JsonConvert.SerializeObject(data);  // object → JSON
-            var xml = JsonConvert.DeserializeXNode(json, "Root");   // JSON → XML
-
-            return Content(xml.ToString(), "application/xml");    // return XML
-        }
-
-        return Ok(data);           // default = JSON
-    }
-
-    // GET: api/device
+    // GET: api/Device
     [HttpGet]
     public IActionResult GetAll()
     {
         try
         {
-            var devices = _deviceService.GetAllDevices();
-            return FormatResponse(devices);
+            var devices = _deviceService.GetAllDevices(); // List<Device>
+            return Ok(devices); // Direct JSON
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error while fetching devices.");
+            _logger.LogError(ex, "Error while fetching devices");
             return StatusCode(500, new { message = "Unexpected error while fetching devices." });
         }
     }
 
+    // GET: api/Device/{id}
     [HttpGet("{id}")]
     public IActionResult GetById(int id)
     {
@@ -70,15 +51,16 @@ public class DeviceController : ControllerBase
             if (device == null)
                 return NotFound(new { message = $"Device with ID {id} not found." });
 
-            return FormatResponse(device);
+            return Ok(device); // Return JSON directly
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error while fetching devices.");
-            return StatusCode(500, new { message = "Unexpected error while fetching devices." });
+            _logger.LogError(ex, "Error while fetching device by ID");
+            return StatusCode(500, new { message = "Unexpected error while fetching device." });
         }
     }
 
+    // POST: api/Device
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateDeviceDto dto)
     {
@@ -111,11 +93,12 @@ public class DeviceController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error while creating devices.");
-            return StatusCode(500, new { message = "Unexpected error while creating devices." });
+            _logger.LogError(ex, "Error while creating device");
+            return StatusCode(500, new { message = "Unexpected error while creating device." });
         }
     }
 
+    // PUT: api/Device/{id}
     [HttpPut("{id}")]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateDeviceDto dto)
     {
@@ -149,11 +132,12 @@ public class DeviceController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error while updating devices.");
-            return StatusCode(500, new { message = "Unexpected error while updating devices." });
+            _logger.LogError(ex, "Error while updating device");
+            return StatusCode(500, new { message = "Unexpected error while updating device." });
         }
     }
 
+    // DELETE: api/Device/{id}
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(int id)
     {
@@ -169,11 +153,12 @@ public class DeviceController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error while deleting devices.");
-            return StatusCode(500, new { message = "Unexpected error while deleting devices." });
+            _logger.LogError(ex, "Error while deleting device");
+            return StatusCode(500, new { message = "Unexpected error while deleting device." });
         }
     }
 
+    // GET: api/Device/paged?pageNumber=1&pageSize=10
     [HttpGet("paged")]
     public IActionResult GetPaged([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 10)
     {
@@ -189,11 +174,11 @@ public class DeviceController : ControllerBase
                 PageSize = pageSize
             };
 
-            return FormatResponse(response);
+            return Ok(response); // Return JSON
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error while fetching devices.");
+            _logger.LogError(ex, "Error while fetching paged devices");
             return StatusCode(500, new { message = "Unexpected error while fetching devices." });
         }
     }

@@ -10,7 +10,6 @@ namespace DeviceManagementAPI.Services
     public class DeviceServiceEf : IDeviceService
     {
         private readonly DeviceDbContext _context;
-
         public DeviceServiceEf(DeviceDbContext context)
         {
             _context = context;
