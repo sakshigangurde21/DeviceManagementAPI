@@ -11,17 +11,17 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// ✅ Add EF Core
+// Add EF Core
 builder.Services.AddDbContext<DeviceDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// ✅ Register EF service instead of ADO.NET
+// Register EF service instead of ADO.NET
 builder.Services.AddScoped<IDeviceService, DeviceServiceEf>();
 
-// ✅ SignalR
+// SignalR
 builder.Services.AddSignalR();
 
-// ✅ Request counter service
+// Request counter service
 builder.Services.AddSingleton<RequestCounterService>();
 builder.Services.AddTransient<RequestCounterMiddleware>();
 

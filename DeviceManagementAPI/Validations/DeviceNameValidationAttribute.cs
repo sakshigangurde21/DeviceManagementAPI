@@ -10,7 +10,7 @@ namespace DeviceManagementAPI.Validations
         {
             var name = value?.ToString()?.Trim() ?? "";
 
-            if (string.IsNullOrWhiteSpace(name))
+            if (string.IsNullOrWhiteSpace(name) || name.Equals("string", StringComparison.OrdinalIgnoreCase))
                 return new ValidationResult("Device name is required.");
 
             if (name.Length > 100)

@@ -1,7 +1,7 @@
 ﻿using DeviceManagementAPI.DTOs;
 using DeviceManagementAPI.Hubs;
 using DeviceManagementAPI.Interfaces;
-using DeviceManagementAPI.Models;
+using DeviceManagementAPI.Entities;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
@@ -11,7 +11,7 @@ using System.Threading.Tasks;
 
 [Route("api/[controller]")]
 [ApiController]
-[Produces("application/json")] // Only JSON needed for React
+[Produces("application/json")] 
 public class DeviceController : ControllerBase
 {
     private readonly IDeviceService _deviceService;

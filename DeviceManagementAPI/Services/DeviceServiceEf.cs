@@ -1,4 +1,4 @@
-﻿using DeviceManagementAPI.Models;
+﻿using DeviceManagementAPI.Entities;
 using DeviceManagementAPI.Interfaces;
 using DeviceManagementAPI.Data;
 using System;

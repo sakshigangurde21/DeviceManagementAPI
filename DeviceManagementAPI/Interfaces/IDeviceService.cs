@@ -1,4 +1,4 @@
-﻿using DeviceManagementAPI.Models;
+﻿using DeviceManagementAPI.Entities;
 using System.Collections.Generic;
 
 namespace DeviceManagementAPI.Interfaces

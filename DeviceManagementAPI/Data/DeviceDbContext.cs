@@ -1,5 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using DeviceManagementAPI.Models;
+using DeviceManagementAPI.Entities;
 
 namespace DeviceManagementAPI.Data
 {
