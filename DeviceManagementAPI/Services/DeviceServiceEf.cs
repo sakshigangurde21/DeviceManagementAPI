@@ -1,6 +1,7 @@
-﻿using DeviceManagementAPI.Entities;
+﻿using DeviceManagementAPI.Data;
+using DeviceManagementAPI.Entities;
 using DeviceManagementAPI.Interfaces;
-using DeviceManagementAPI.Data;
+using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -40,14 +41,18 @@ namespace DeviceManagementAPI.Services
             existing.Description = device.Description;
             return _context.SaveChanges() > 0;
         }
-
         public bool DeleteDevice(int id)
         {
             var device = _context.Devices.FirstOrDefault(d => d.Id == id);
             if (device == null) return false;
 
-            _context.Devices.Remove(device);
+            device.IsDeleted = true;  // SAFE DELETE
             return _context.SaveChanges() > 0;
+        }
+
+        public List<Device> GetAllDevicesIncludingDeleted()
+        {
+            return _context.Devices.IgnoreQueryFilters().ToList();
         }
 
         public (List<Device> Devices, int TotalCount) GetDevicesPagination(int pageNumber, int pageSize)

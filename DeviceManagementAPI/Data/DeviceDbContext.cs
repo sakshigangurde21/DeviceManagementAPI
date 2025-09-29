@@ -8,5 +8,12 @@ namespace DeviceManagementAPI.Data
         public DeviceDbContext(DbContextOptions<DeviceDbContext> options) : base(options) { }
 
         public DbSet<Device> Devices { get; set; }
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            modelBuilder.Entity<Device>().HasQueryFilter(d => !d.IsDeleted);
+            base.OnModelCreating(modelBuilder);
+        }
+
     }
 }

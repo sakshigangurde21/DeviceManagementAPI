@@ -9,7 +9,6 @@
     {
         private readonly ILogger<RequestCounterMiddleware> _logger;
         private readonly RequestCounterService _counterService;
-
         public RequestCounterMiddleware(
             ILogger<RequestCounterMiddleware> logger,
             RequestCounterService counterService)
