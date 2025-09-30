@@ -11,7 +11,7 @@ using System.Threading.Tasks;
 
 [Route("api/[controller]")]
 [ApiController]
-[Produces("application/json")] 
+[Produces("application/json")]
 public class DeviceController : ControllerBase
 {
     private readonly IDeviceService _deviceService;
@@ -25,14 +25,17 @@ public class DeviceController : ControllerBase
         _logger = logger;
     }
 
-    // GET: api/Device
+    // GET: api/Device?deleted=false
     [HttpGet]
-    public IActionResult GetAll()
+    public IActionResult GetAll([FromQuery] bool deleted = false)
     {
         try
         {
-            var devices = _deviceService.GetAllDevices(); // List<Device>
-            return Ok(devices); // Direct JSON
+            var devices = deleted
+                ? _deviceService.GetDeletedDevices()
+                : _deviceService.GetAllDevices();
+
+            return Ok(devices);
         }
         catch (Exception ex)
         {
@@ -51,7 +54,7 @@ public class DeviceController : ControllerBase
             if (device == null)
                 return NotFound(new { message = $"Device with ID {id} not found." });
 
-            return Ok(device); // Return JSON directly
+            return Ok(device);
         }
         catch (Exception ex)
         {
@@ -137,13 +140,13 @@ public class DeviceController : ControllerBase
         }
     }
 
-    // DELETE: api/Device/{id}
+    // DELETE: api/Device/{id}   --> SOFT DELETE
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(int id)
     {
         try
         {
-            bool success = _deviceService.DeleteDevice(id);
+            bool success = _deviceService.SoftDeleteDevice(id);
             if (!success)
                 return NotFound(new { message = $"Device with ID {id} not found." });
 
@@ -158,23 +161,92 @@ public class DeviceController : ControllerBase
         }
     }
 
-    // GET: api/Device/paged?pageNumber=1&pageSize=10
-    [HttpGet("paged")]
-    public IActionResult GetPaged([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 10)
+    // PUT: api/Device/restore/{id}  --> RESTORE
+    [HttpPut("restore/{id}")]
+    public async Task<IActionResult> RestoreDevice(int id)
     {
         try
         {
-            var (devices, totalCount) = _deviceService.GetDevicesPagination(pageNumber, pageSize);
+            bool success = _deviceService.RestoreDevice(id);
+            if (!success)
+                return NotFound(new { message = $"Deleted device with ID {id} not found." });
 
+            await _hubContext.Clients.All.SendAsync("ReceiveNotification", "Device restored successfully");
+
+            return Ok(new { message = $"Device with ID {id} restored successfully." });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error while restoring device");
+            return StatusCode(500, new { message = "Unexpected error while restoring device." });
+        }
+    }
+
+    // PUT: api/Device/restoreAll  --> RESTORE ALL
+    [HttpPut("restoreAll")]
+    public async Task<IActionResult> RestoreAllDeletedDevices()
+    {
+        try
+        {
+            bool success = _deviceService.RestoreAllDeletedDevices();
+            if (!success)
+                return NotFound(new { message = "No deleted devices found to restore." });
+
+            await _hubContext.Clients.All.SendAsync("ReceiveNotification", "All deleted devices restored successfully");
+
+            return Ok(new { message = "All deleted devices restored successfully." });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error while restoring all devices");
+            return StatusCode(500, new { message = "Unexpected error while restoring devices." });
+        }
+    }
+
+    // DELETE: api/Device/permanent/{id}  --> PERMANENT DELETE
+    [HttpDelete("permanent/{id}")]
+    public async Task<IActionResult> DeletePermanent(int id)
+    {
+        try
+        {
+            bool success = _deviceService.PermanentDeleteDevice(id);
+            if (!success)
+                return NotFound(new { message = $"Device with ID {id} not found for permanent deletion." });
+
+            await _hubContext.Clients.All.SendAsync("ReceiveNotification", "Device permanently deleted");
+
+            return Ok(new { message = $"Device with ID {id} permanently deleted." });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error while permanently deleting device");
+            return StatusCode(500, new { message = "Unexpected error while permanently deleting device." });
+        }
+    }
+
+    // GET: api/Device/paged?pageNumber=1&pageSize=10
+    [HttpGet("paged")]
+    public IActionResult GetPaged(
+    [FromQuery] int pageNumber = 1,
+    [FromQuery] int pageSize = 10,
+    [FromQuery] bool includeDeleted = false)
+    {
+        try
+        {
+            // Fetch devices from service with includeDeleted flag
+            var (devices, totalCount) = _deviceService.GetDevicesPagination(pageNumber, pageSize, includeDeleted);
+
+            // Ensure pagination includes deleted devices when requested
             var response = new
             {
                 Data = devices,
                 TotalRecords = totalCount,
                 PageNumber = pageNumber,
-                PageSize = pageSize
+                PageSize = pageSize,
+                IncludeDeleted = includeDeleted
             };
 
-            return Ok(response); // Return JSON
+            return Ok(response);
         }
         catch (Exception ex)
         {
@@ -182,4 +254,5 @@ public class DeviceController : ControllerBase
             return StatusCode(500, new { message = "Unexpected error while fetching devices." });
         }
     }
+
 }

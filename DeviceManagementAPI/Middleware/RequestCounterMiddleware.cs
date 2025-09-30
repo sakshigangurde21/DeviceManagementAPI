@@ -16,7 +16,6 @@
             _logger = logger;
             _counterService = counterService;
         }
-
         public async Task InvokeAsync(HttpContext context, RequestDelegate next)
         {
             var method = context.Request.Method;

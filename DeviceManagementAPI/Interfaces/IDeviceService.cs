@@ -5,11 +5,24 @@ namespace DeviceManagementAPI.Interfaces
 {
     public interface IDeviceService
     {
-        List<Device> GetAllDevices();
+        List<Device> GetAllDevices(); // Only active devices
+        List<Device> GetDeletedDevices(); // Only deleted devices
+
         Device? GetDeviceById(int id);
         bool CreateDevice(Device device);
         bool UpdateDevice(Device device);
-        bool DeleteDevice(int id);
-        (List<Device> Devices, int TotalCount) GetDevicesPagination(int pageNumber, int pageSize);
+
+        // Soft delete
+        bool SoftDeleteDevice(int id);
+
+        // Restore
+        bool RestoreDevice(int id);
+        bool RestoreAllDeletedDevices();
+
+        // Optional hard delete if needed
+        bool PermanentDeleteDevice(int id);
+
+        // Pagination (optional)
+        (List<Device> Devices, int TotalCount) GetDevicesPagination(int pageNumber, int pageSize, bool includeDeleted = false);
     }
 }
