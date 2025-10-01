@@ -1,7 +1,8 @@
 ﻿using DeviceManagementAPI.DTOs;
+using DeviceManagementAPI.Entities;
 using DeviceManagementAPI.Hubs;
 using DeviceManagementAPI.Interfaces;
-using DeviceManagementAPI.Entities;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
@@ -9,6 +10,7 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 
+// [Authorize]  // require authentication
 [Route("api/[controller]")]
 [ApiController]
 [Produces("application/json")]
@@ -17,7 +19,6 @@ public class DeviceController : ControllerBase
     private readonly IDeviceService _deviceService;
     private readonly IHubContext<DeviceHub> _hubContext;
     private readonly ILogger<DeviceController> _logger;
-
     public DeviceController(IDeviceService deviceService, IHubContext<DeviceHub> hubContext, ILogger<DeviceController> logger)
     {
         _deviceService = deviceService;

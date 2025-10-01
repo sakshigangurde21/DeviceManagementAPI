@@ -12,6 +12,8 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+		<PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
+		<PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.16" />
 		<PackageReference Include="Microsoft.AspNetCore.Mvc.Versioning" Version="5.1.0" />
 		<PackageReference Include="Microsoft.AspNetCore.SignalR" Version="1.2.0" />
 		<PackageReference Include="Microsoft.Data.SqlClient" Version="6.1.1" />
