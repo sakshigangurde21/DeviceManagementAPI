@@ -1,18 +1,19 @@
-﻿using DeviceManagementAPI.Hubs;
+﻿using DeviceManagementAPI.Data;
+using DeviceManagementAPI.Hubs;
 using DeviceManagementAPI.Interfaces;
-using DeviceManagementAPI.Services;
 using DeviceManagementAPI.Middleware;
-using DeviceManagementAPI.Data;
-using Microsoft.EntityFrameworkCore;
+using DeviceManagementAPI.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-using System.Text;
 using Microsoft.OpenApi.Models;
+using System.Security.Claims;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // ----------------------- JWT Authentication -----------------------
-var key = builder.Configuration["Jwt:Key"] ?? "supersecretkey12345"; // fallback key
+var key = builder.Configuration["Jwt:Key"] ?? "supersecretkey12345678901234567890"; // fallback key
 
 builder.Services.AddAuthentication(options =>
 {
@@ -27,7 +28,8 @@ builder.Services.AddAuthentication(options =>
         ValidateAudience = false,
         ValidateLifetime = true,
         ValidateIssuerSigningKey = true,
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key))
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key)),
+        RoleClaimType = ClaimTypes.Role // <- ensures "Admin"/"User" roles are recognized
     };
 });
 

@@ -10,7 +10,7 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 
-// [Authorize]  // require authentication
+[Authorize] // Require authentication for all endpoints by default
 [Route("api/[controller]")]
 [ApiController]
 [Produces("application/json")]
@@ -28,6 +28,7 @@ public class DeviceController : ControllerBase
 
     // GET: api/Device?deleted=false
     [HttpGet]
+    [Authorize(Roles = "Admin,User")] // Both can view devices
     public IActionResult GetAll([FromQuery] bool deleted = false)
     {
         try
@@ -47,6 +48,7 @@ public class DeviceController : ControllerBase
 
     // GET: api/Device/{id}
     [HttpGet("{id}")]
+    [Authorize(Roles = "Admin,User")]
     public IActionResult GetById(int id)
     {
         try
@@ -66,6 +68,7 @@ public class DeviceController : ControllerBase
 
     // POST: api/Device
     [HttpPost]
+    [Authorize(Roles = "Admin,User")]
     public async Task<IActionResult> Create([FromBody] CreateDeviceDto dto)
     {
         try
@@ -104,6 +107,7 @@ public class DeviceController : ControllerBase
 
     // PUT: api/Device/{id}
     [HttpPut("{id}")]
+    [Authorize(Roles = "Admin,User")]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateDeviceDto dto)
     {
         try
@@ -143,6 +147,7 @@ public class DeviceController : ControllerBase
 
     // DELETE: api/Device/{id}   --> SOFT DELETE
     [HttpDelete("{id}")]
+    [Authorize(Roles = "Admin")] // Only Admin can delete
     public async Task<IActionResult> Delete(int id)
     {
         try
@@ -164,6 +169,7 @@ public class DeviceController : ControllerBase
 
     // PUT: api/Device/restore/{id}  --> RESTORE
     [HttpPut("restore/{id}")]
+    [Authorize(Roles = "Admin")] // Only Admin can restore
     public async Task<IActionResult> RestoreDevice(int id)
     {
         try
@@ -185,6 +191,7 @@ public class DeviceController : ControllerBase
 
     // PUT: api/Device/restoreAll  --> RESTORE ALL
     [HttpPut("restoreAll")]
+    [Authorize(Roles = "Admin")] // Only Admin can restore all
     public async Task<IActionResult> RestoreAllDeletedDevices()
     {
         try
@@ -206,6 +213,7 @@ public class DeviceController : ControllerBase
 
     // DELETE: api/Device/permanent/{id}  --> PERMANENT DELETE
     [HttpDelete("permanent/{id}")]
+    [Authorize(Roles = "Admin")] // Only Admin can permanently delete
     public async Task<IActionResult> DeletePermanent(int id)
     {
         try
@@ -227,6 +235,7 @@ public class DeviceController : ControllerBase
 
     // GET: api/Device/paged?pageNumber=1&pageSize=10
     [HttpGet("paged")]
+    [Authorize(Roles = "Admin,User")]
     public IActionResult GetPaged(
     [FromQuery] int pageNumber = 1,
     [FromQuery] int pageSize = 10,
