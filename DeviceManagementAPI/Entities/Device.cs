@@ -12,5 +12,8 @@ namespace DeviceManagementAPI.Entities
         public string Description { get; set; } = string.Empty;
         public bool IsDeleted { get; set; } = false;  // soft delete flag
 
+        [BindNever] // this will store which user added the device
+        public string UserId { get; set; } = string.Empty;
+
     }
 }

@@ -9,6 +9,10 @@ using Microsoft.Extensions.Logging;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims; // make sure this is added
+
+
 
 [Authorize] // Require authentication for all endpoints by default
 [Route("api/[controller]")]
@@ -33,9 +37,14 @@ public class DeviceController : ControllerBase
     {
         try
         {
+            var userId = User.FindFirst("UserId")?.Value;
+            if (string.IsNullOrEmpty(userId))
+                return Unauthorized(new { message = "Invalid token: UserId missing" });
+
             var devices = deleted
-                ? _deviceService.GetDeletedDevices()
-                : _deviceService.GetAllDevices();
+               ? _deviceService.GetDeletedDevices().Where(d => d.UserId == userId)
+               : _deviceService.GetAllDevices().Where(d => d.UserId == userId);
+
 
             return Ok(devices);
         }
@@ -68,7 +77,7 @@ public class DeviceController : ControllerBase
 
     // POST: api/Device
     [HttpPost]
-    [Authorize(Roles = "Admin,User")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Create([FromBody] CreateDeviceDto dto)
     {
         try
@@ -82,12 +91,16 @@ public class DeviceController : ControllerBase
             if (allDevices.Any(d => d.DeviceName.Trim().ToLower() == trimmedName.ToLower()))
                 return BadRequest(new { message = "Device with this name already exists." });
 
+            var userId = User.FindFirst("UserId")?.Value ?? ""; // JWT "sub" claim usually holds user ID
+
             var device = new Device
             {
                 DeviceName = trimmedName,
                 Description = string.IsNullOrWhiteSpace(dto.Description) || dto.Description.Trim().ToLower() == "string"
                     ? "No description"
-                    : dto.Description.Trim()
+                    : dto.Description.Trim(),
+                UserId = userId
+
             };
 
             bool success = _deviceService.CreateDevice(device);
