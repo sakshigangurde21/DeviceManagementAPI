@@ -2,6 +2,7 @@
 using DeviceManagementAPI.DTO;
 using DeviceManagementAPI.DTOs;
 using DeviceManagementAPI.Entities;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -68,12 +69,37 @@ namespace DeviceManagementAPI.Controllers
 
             var token = GenerateJwtToken(user);
 
-            return Ok(new
+            // ✅ Set JWT as HttpOnly cookie
+            Response.Cookies.Append("jwt", token, new CookieOptions
             {
-                token,
-                username = user.Username,
-                role = user.Role
+                HttpOnly = true,
+                Secure = true,
+                SameSite = SameSiteMode.None, // needed if frontend runs on different port
+                Expires = DateTime.UtcNow.AddHours(2)
             });
+
+            return Ok(new { message = "Login successful", username = user.Username, role = user.Role });
+        }
+
+
+        // GET: api/auth/profile
+        [Authorize]
+        [HttpGet("profile")]
+        public IActionResult GetProfile()
+        {
+            var username = User.Identity?.Name;
+            var role = User.FindFirst(ClaimTypes.Role)?.Value;
+            var userId = User.FindFirst("UserId")?.Value;
+
+            return Ok(new { userId, username, role });
+        }
+
+        // POST: api/auth/logout
+        [HttpPost("logout")]
+        public IActionResult Logout()
+        {
+            Response.Cookies.Delete("jwt");
+            return Ok(new { message = "Logged out successfully" });
         }
 
         private string GenerateJwtToken(User user)

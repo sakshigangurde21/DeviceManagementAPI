@@ -77,7 +77,7 @@ public class DeviceController : ControllerBase
 
     // POST: api/Device
     [HttpPost]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin, User")]
     public async Task<IActionResult> Create([FromBody] CreateDeviceDto dto)
     {
         try
@@ -251,7 +251,7 @@ public class DeviceController : ControllerBase
     [Authorize(Roles = "Admin,User")]
     public IActionResult GetPaged(
     [FromQuery] int pageNumber = 1,
-    [FromQuery] int pageSize = 10,
+    [FromQuery] int pageSize = 5,
     [FromQuery] bool includeDeleted = false)
     {
         try

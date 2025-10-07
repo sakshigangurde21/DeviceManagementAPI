@@ -1,9 +1,11 @@
 ﻿using DeviceManagementAPI.Data;
+using DeviceManagementAPI.Entities;
 using DeviceManagementAPI.Hubs;
 using DeviceManagementAPI.Interfaces;
 using DeviceManagementAPI.Middleware;
 using DeviceManagementAPI.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -13,7 +15,7 @@ using System.Text;
 var builder = WebApplication.CreateBuilder(args);
 
 // ----------------------- JWT Authentication -----------------------
-var key = builder.Configuration["Jwt:Key"] ?? "supersecretkey12345678901234567890"; // fallback key
+var key = builder.Configuration["Jwt:Key"] ?? "supersecretkey12345678901234567890";
 
 builder.Services.AddAuthentication(options =>
 {
@@ -29,7 +31,20 @@ builder.Services.AddAuthentication(options =>
         ValidateLifetime = true,
         ValidateIssuerSigningKey = true,
         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key)),
-        RoleClaimType = ClaimTypes.Role // <- ensures "Admin"/"User" roles are recognized
+        RoleClaimType = ClaimTypes.Role
+    };
+
+    // ✅ Extract token from cookie
+    options.Events = new JwtBearerEvents
+    {
+        OnMessageReceived = context =>
+        {
+            if (context.Request.Cookies.ContainsKey("jwt"))
+            {
+                context.Token = context.Request.Cookies["jwt"];
+            }
+            return Task.CompletedTask;
+        }
     };
 });
 
@@ -38,7 +53,6 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
-    // JWT Auth in Swagger
     options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         Name = "Authorization",
@@ -46,7 +60,7 @@ builder.Services.AddSwaggerGen(options =>
         Scheme = "Bearer",
         BearerFormat = "JWT",
         In = ParameterLocation.Header,
-        Description = "Enter 'Bearer {your token}' to authorize"
+        Description = "Enter 'Bearer {your token}'"
     });
 
     options.AddSecurityRequirement(new OpenApiSecurityRequirement
@@ -69,7 +83,7 @@ builder.Services.AddSwaggerGen(options =>
 builder.Services.AddDbContext<DeviceDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// Register EF service instead of ADO.NET
+// ----------------------- Services -----------------------
 builder.Services.AddScoped<IDeviceService, DeviceServiceEf>();
 
 // ----------------------- SignalR -----------------------
@@ -91,7 +105,6 @@ builder.Services.AddCors(options =>
                         .AllowCredentials());
 });
 
-// ----------------------- Build App -----------------------
 var app = builder.Build();
 
 // ----------------------- Swagger -----------------------
@@ -106,14 +119,44 @@ app.UseHttpsRedirection();
 app.UseRouting();
 app.UseCors("AllowFrontend");
 app.UseMiddleware<RequestCounterMiddleware>();
-
-// Authentication & Authorization
-app.UseAuthentication();  // Must be before UseAuthorization
+app.UseAuthentication();
 app.UseAuthorization();
 
-// ----------------------- Map Endpoints -----------------------
 app.MapControllers();
 app.MapHub<DeviceHub>("/deviceHub");
+
+// ----------------------- SEED ADMIN USER -----------------------
+using (var scope = app.Services.CreateScope())
+{
+    var context = scope.ServiceProvider.GetRequiredService<DeviceDbContext>();
+
+    // Apply pending migrations automatically
+    context.Database.Migrate();
+
+    // Check if Admin exists
+    if (!context.Users.Any(u => u.Role == "Admin"))
+    {
+        var passwordHasher = new PasswordHasher<User>();
+
+        var admin = new User
+        {
+            Username = "admin",
+            Role = "Admin"
+        };
+
+        // Hash password before saving
+        admin.PasswordHash = passwordHasher.HashPassword(admin, "Admin@123");
+
+        context.Users.Add(admin);
+        context.SaveChanges();
+
+        Console.WriteLine("Seeded Admin user successfully!"); 
+    }
+    else
+    {
+        Console.WriteLine("Admin user already exists. Skipping seed...");
+    }
+}
 
 // ----------------------- Run App -----------------------
 app.Run();
