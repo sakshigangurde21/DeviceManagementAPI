@@ -34,19 +34,30 @@ builder.Services.AddAuthentication(options =>
         RoleClaimType = ClaimTypes.Role
     };
 
-    // ✅ Extract token from cookie
+    // ✅ For WebSocket (SignalR)
     options.Events = new JwtBearerEvents
     {
         OnMessageReceived = context =>
         {
+            // Normal cookie usage for APIs
             if (context.Request.Cookies.ContainsKey("jwt"))
             {
                 context.Token = context.Request.Cookies["jwt"];
             }
+
+            // ✅ Also allow token from query string (SignalR WebSocket fallback)
+            var accessToken = context.Request.Query["access_token"];
+            var path = context.HttpContext.Request.Path;
+            if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/deviceHub"))
+            {
+                context.Token = accessToken;
+            }
+
             return Task.CompletedTask;
         }
     };
 });
+
 
 // ----------------------- Controllers & Swagger -----------------------
 builder.Services.AddControllers();
@@ -136,17 +147,12 @@ using (var scope = app.Services.CreateScope())
     // Check if Admin exists
     if (!context.Users.Any(u => u.Role == "Admin"))
     {
-        var passwordHasher = new PasswordHasher<User>();
-
         var admin = new User
         {
             Username = "admin",
-            Role = "Admin"
+            Role = "Admin",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin@123") // match login logic
         };
-
-        // Hash password before saving
-        admin.PasswordHash = passwordHasher.HashPassword(admin, "Admin@123");
-
         context.Users.Add(admin);
         context.SaveChanges();
 

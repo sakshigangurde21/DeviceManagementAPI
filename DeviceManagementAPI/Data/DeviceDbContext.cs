@@ -10,12 +10,16 @@ namespace DeviceManagementAPI.Data
         public DbSet<Device> Devices { get; set; }
 
         public DbSet<User> Users { get; set; }
-
+       
+        // 👇 Add this new DbSet
+        public DbSet<RefreshToken> RefreshTokens { get; set; }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             modelBuilder.Entity<Device>().HasQueryFilter(d => !d.IsDeleted);
             base.OnModelCreating(modelBuilder);
         }
+        public DbSet<Notification> Notifications { get; set; }
+
 
     }
 }

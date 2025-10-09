@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 
 namespace DeviceManagementAPI.Controllers
@@ -67,18 +68,99 @@ namespace DeviceManagementAPI.Controllers
             if (!BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
                 return Unauthorized(new { message = "Invalid password" }); // <-- 401
 
-            var token = GenerateJwtToken(user);
 
-            // ✅ Set JWT as HttpOnly cookie
-            Response.Cookies.Append("jwt", token, new CookieOptions
+            // Generate short-lived access token
+            var accessToken = GenerateJwtToken(user, 15); // 15 mins
+            // Generate refresh token and store in DB
+            var refreshToken = CreateRefreshToken(Request.HttpContext.Connection.RemoteIpAddress?.ToString());
+
+            var refreshEntity = new RefreshToken
+            {
+                Token = refreshToken.Token,
+                Expires = refreshToken.Expires,
+                Created = refreshToken.Created,
+                CreatedByIp = refreshToken.CreatedByIp,
+                UserId = user.Id
+            };
+
+            _context.RefreshTokens.Add(refreshEntity);
+            await _context.SaveChangesAsync();
+
+            // Set cookies
+            Response.Cookies.Append("jwt", accessToken, new CookieOptions
             {
                 HttpOnly = true,
                 Secure = true,
                 SameSite = SameSiteMode.None, // needed if frontend runs on different port
-                Expires = DateTime.UtcNow.AddHours(2)
+                Expires = DateTime.UtcNow.AddMinutes(15)
+            });
+
+            Response.Cookies.Append("refreshToken", refreshEntity.Token, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = true,
+                SameSite = SameSiteMode.None,
+                Expires = refreshEntity.Expires
             });
 
             return Ok(new { message = "Login successful", username = user.Username, role = user.Role });
+        }
+
+
+        // POST: api/auth/refresh
+        [HttpPost("refresh")]
+        public async Task<IActionResult> Refresh()
+        {
+            if (!Request.Cookies.TryGetValue("refreshToken", out var token))
+                return Unauthorized(new { message = "No refresh token provided" });
+
+            var existing = await _context.RefreshTokens
+                .Include(r => r.User)
+                .FirstOrDefaultAsync(r => r.Token == token);
+
+            if (existing == null || !existing.IsActive)
+                return Unauthorized(new { message = "Invalid or expired refresh token" });
+
+            // Rotate refresh token
+            var newRefresh = CreateRefreshToken(Request.HttpContext.Connection.RemoteIpAddress?.ToString());
+
+            existing.Revoked = DateTime.UtcNow;
+            existing.RevokedByIp = Request.HttpContext.Connection.RemoteIpAddress?.ToString();
+            existing.ReplacedByToken = newRefresh.Token;
+
+            var newRefreshEntity = new RefreshToken
+            {
+                Token = newRefresh.Token,
+                Expires = newRefresh.Expires,
+                Created = newRefresh.Created,
+                CreatedByIp = newRefresh.CreatedByIp,
+                UserId = existing.UserId
+            };
+
+            _context.RefreshTokens.Add(newRefreshEntity);
+            await _context.SaveChangesAsync();
+
+            // Generate new JWT
+            var accessToken = GenerateJwtToken(existing.User!, 15);
+
+            // Set new cookies
+            Response.Cookies.Append("jwt", accessToken, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = true,
+                SameSite = SameSiteMode.None,
+                Expires = DateTime.UtcNow.AddMinutes(1)
+            });
+
+            Response.Cookies.Append("refreshToken", newRefreshEntity.Token, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = true,
+                SameSite = SameSiteMode.None,
+                Expires = newRefreshEntity.Expires
+            });
+
+            return Ok(new { message = "Token refreshed successfully" });
         }
 
 
@@ -96,13 +178,43 @@ namespace DeviceManagementAPI.Controllers
 
         // POST: api/auth/logout
         [HttpPost("logout")]
-        public IActionResult Logout()
+        public async Task<IActionResult> Logout()
         {
-            Response.Cookies.Delete("jwt");
+            if (Request.Cookies.TryGetValue("refreshToken", out var token))
+            {
+                var existing = await _context.RefreshTokens.FirstOrDefaultAsync(r => r.Token == token);
+                if (existing != null && existing.Revoked == null)
+                {
+                    existing.Revoked = DateTime.UtcNow;
+                    existing.RevokedByIp = Request.HttpContext.Connection.RemoteIpAddress?.ToString();
+                    await _context.SaveChangesAsync();
+                }
+
+                Response.Cookies.Delete("refreshToken", new CookieOptions
+                {
+                    HttpOnly = true,
+                    Secure = true,
+                    SameSite = SameSiteMode.None
+                });
+            }
+
+            if (Request.Cookies.ContainsKey("jwt"))
+            {
+                Response.Cookies.Delete("jwt", new CookieOptions
+                {
+                    HttpOnly = true,
+                    Secure = true,
+                    SameSite = SameSiteMode.None
+                });
+            }
+
             return Ok(new { message = "Logged out successfully" });
         }
 
-        private string GenerateJwtToken(User user)
+
+        // ================= Helper Methods =================
+
+        private string GenerateJwtToken(User user, int minutesValid)
         {
             var key = _config["Jwt:Key"] ?? "supersecretkey12345678901234567890";
             var creds = new SigningCredentials(
@@ -112,18 +224,31 @@ namespace DeviceManagementAPI.Controllers
 
             var claims = new[]
             {
-                new Claim("UserId", user.Id.ToString()),  // <- custom claim
-                new Claim(ClaimTypes.Name, user.Username),
-                new Claim(ClaimTypes.Role, user.Role)
-            };
+        new Claim("UserId", user.Id.ToString()),
+        new Claim(ClaimTypes.Name, user.Username),
+        new Claim(ClaimTypes.Role, user.Role)
+    };
 
             var token = new JwtSecurityToken(
                 claims: claims,
-                expires: DateTime.UtcNow.AddHours(2),
+                expires: DateTime.UtcNow.AddMinutes(minutesValid),
                 signingCredentials: creds
             );
 
             return new JwtSecurityTokenHandler().WriteToken(token);
+        }
+
+        private (string Token, DateTime Expires, DateTime Created, string? CreatedByIp) CreateRefreshToken(string? ipAddress)
+        {
+            var randomBytes = new byte[64];
+            using var rng = RandomNumberGenerator.Create();
+            rng.GetBytes(randomBytes);
+
+            var token = Convert.ToBase64String(randomBytes);
+            var created = DateTime.UtcNow;
+            var expires = created.AddDays(7); // Refresh token valid for 7 days
+
+            return (token, expires, created, ipAddress);
         }
     }
 }
