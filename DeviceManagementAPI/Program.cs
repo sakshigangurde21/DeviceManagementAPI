@@ -34,7 +34,7 @@ builder.Services.AddAuthentication(options =>
         RoleClaimType = ClaimTypes.Role
     };
 
-    // ✅ For WebSocket (SignalR)
+    // For WebSocket (SignalR)
     options.Events = new JwtBearerEvents
     {
         OnMessageReceived = context =>
@@ -45,7 +45,7 @@ builder.Services.AddAuthentication(options =>
                 context.Token = context.Request.Cookies["jwt"];
             }
 
-            // ✅ Also allow token from query string (SignalR WebSocket fallback)
+            // Also allow token from query string (SignalR WebSocket fallback)
             var accessToken = context.Request.Query["access_token"];
             var path = context.HttpContext.Request.Path;
             if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/deviceHub"))
